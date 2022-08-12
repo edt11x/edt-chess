@@ -42,6 +42,15 @@ def possiblePawnMoves(array, color, piece):
             print(' possible move to', end=' ')
             piece.printNewPosition(piece.col, piece.row-1)
     # walk through the array and see if we can move two spaces forward?
+    if (piece.color == color) and (piece.name == 'Pawn') and (piece.row != 8) and (piece.row != 1):
+        if (piece.color == 'White') and (checkIfSquareIsOccupied(array, piece.col, piece.row+1) == False):
+            if (piece.row == 2) and (piece.firstMove) and (checkIfSquareIsOccupied(array, piece.col, piece.row+2) == False):
+                print(' possible move to', end=' ')
+                piece.printNewPosition(piece.col, piece.row+2)
+        if (piece.color == 'Black') and (checkIfSquareIsOccupied(array, piece.col, piece.row-1) == False):
+            if (piece.row == 7) and (piece.firstMove) and (checkIfSquareIsOccupied(array, piece.col, piece.row-2) == False):
+                print(' possible move to', end=' ')
+                piece.printNewPosition(piece.col, piece.row-2)
     # walk through the array and see if we can take left?
     # walk through the array and see if we can take right?
     # walk through the array and check to see if we can take en passant?
