@@ -20,7 +20,7 @@ def initPositions(array, color, name, columns, row):
 
 # rather than worry about a separate concept of squares, we are just going to
 # keep track of the positions that the pieces occupy.
-def checkIfSquareIsOccupied(array, col, row):
+def isSquareOccupied(array, col, row):
     ret = False
     for x in range(len(array)):
         if ((array[x].col == col) and (array[x].row == row)):
@@ -33,24 +33,23 @@ def randomMovePiece(array, color):
             print('Try to move', Pieces[x].color,  Pieces[x].name, 'at :', Pieces[x].col, Pieces[x].row)
 
 def possiblePawnMoves(array, color, piece):
-    # walk through the array and see if we can move one space forward?
-    if (piece.color == color) and (piece.name == 'Pawn') and (piece.row != 8) and (piece.row != 1):
-        if (piece.color == 'White') and (checkIfSquareIsOccupied(array, piece.col, piece.row+1) == False):
+    if (piece.name == 'Pawn') and (piece.row != 8) and (piece.row != 1) and (piece.color == color):
+        # walk through the array and see if we can move one space forward?
+        if (piece.color == 'White') and (isSquareOccupied(array, piece.col, piece.row+1) == False):
             print(' possible move to', end=' ')
             piece.printNewPosition(piece.col, piece.row+1)
-        if (piece.color == 'Black') and (checkIfSquareIsOccupied(array, piece.col, piece.row-1) == False):
+        if (piece.color == 'Black') and (isSquareOccupied(array, piece.col, piece.row-1) == False):
             print(' possible move to', end=' ')
             piece.printNewPosition(piece.col, piece.row-1)
-    # walk through the array and see if we can move two spaces forward?
-    if (piece.color == color) and (piece.name == 'Pawn') and (piece.row != 8) and (piece.row != 1):
-        if (piece.color == 'White') and (checkIfSquareIsOccupied(array, piece.col, piece.row+1) == False):
-            if (piece.row == 2) and (piece.firstMove) and (checkIfSquareIsOccupied(array, piece.col, piece.row+2) == False):
+        # walk through the array and see if we can move two spaces forward?
+        if (piece.color == 'White') and (isSquareOccupied(array, piece.col, piece.row+1) == False):
+            if (piece.row == 2) and (piece.firstMove) and (isSquareOccupied(array, piece.col, piece.row+2) == False):
                 print(' possible move to', end=' ')
                 piece.printNewPosition(piece.col, piece.row+2)
-        if (piece.color == 'Black') and (checkIfSquareIsOccupied(array, piece.col, piece.row-1) == False):
-            if (piece.row == 7) and (piece.firstMove) and (checkIfSquareIsOccupied(array, piece.col, piece.row-2) == False):
-                print(' possible move to', end=' ')
-                piece.printNewPosition(piece.col, piece.row-2)
+        if (piece.color == 'Black') and (isSquareOccupied(array, piece.col, piece.row-1) == False):
+            if (piece.row == 7) and (piece.firstMove) and (isSquareOccupied(array, piece.col, piece.row-2) == False):
+                    print(' possible move to', end=' ')
+                    piece.printNewPosition(piece.col, piece.row-2)
     # walk through the array and see if we can take left?
     # walk through the array and see if we can take right?
     # walk through the array and check to see if we can take en passant?
