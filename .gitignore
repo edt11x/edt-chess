@@ -1,3 +1,12 @@
+/.venv/
+venv/
+ENV/
+env/
+
+# Byte-compiled / caches
+__pycache__/
+*.py[cod]
+*$py.class
 .vscode/
 # compiled includes
 *.d
