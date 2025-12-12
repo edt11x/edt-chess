@@ -1,3 +1,4 @@
 # Add third-party packages here. Examples:
 # chess-moves
 # python-chess
+tkinter
