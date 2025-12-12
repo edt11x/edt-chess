@@ -1,22 +1,17 @@
+
 {
-  "name": "Ubuntu Dev Environment",
-  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "name": "Custom Ubuntu",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
   "customizations": {
     "vscode": {
       "extensions": [
         "ms-python.python",
         "ms-vscode.cpptools"
-        // Add more extensions as needed
       ]
     }
   },
-  {
-    "name": "Custom Ubuntu",
-    "build": {
-      "dockerfile": "Dockerfile"
-    }
-   }
-}
   "postCreateCommand": "echo 'Environment ready!'"
 }
 
