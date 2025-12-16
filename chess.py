@@ -312,8 +312,23 @@ def list_pieces(pieces):
         print(p.color, p.name, 'at', p.col + str(p.row))
 
 
-def repl(pieces):
-    print('Terminal chess viewer. Type "help" for commands.')
+def ask_player_color():
+    prompt = 'Play as White or Black? [W/b]: '
+    while True:
+        try:
+            choice = input(prompt).strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            print('\nDefaulting to White')
+            return 'White'
+        if choice == '' or choice in ('w', 'white'):
+            return 'White'
+        if choice in ('b', 'black'):
+            return 'Black'
+        print('Please enter W (White) or B (Black).')
+
+
+def repl(pieces, player_color):
+    print(f'Terminal chess viewer. You are playing {player_color}. Type "help" for commands.')
     while True:
         try:
             cmd = input('> ').strip()
@@ -354,5 +369,6 @@ def repl(pieces):
 
 
 if __name__ == '__main__':
+    player_color = ask_player_color()
     render_board_terminal(Pieces)
-    repl(Pieces)
+    repl(Pieces, player_color)
