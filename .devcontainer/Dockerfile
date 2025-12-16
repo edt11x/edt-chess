@@ -6,6 +6,7 @@ RUN apt-get update && \
         python3 \
         python3-pip \
 	python3.10-venv \
+	python3-tk \
         git \
         curl && \
     apt-get clean && \

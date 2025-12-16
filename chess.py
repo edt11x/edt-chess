@@ -1,5 +1,5 @@
 #
-import tkinter as tk
+import sys
 
 
 class Piece:
@@ -242,10 +242,8 @@ def draw_piece(canvas, piece, square_size):
 
 
 def draw_all_pieces(canvas, pieces, square_size):
-    # remove previously drawn pieces
-    canvas.delete("piece")
-    for p in pieces:
-        draw_piece(canvas, p, square_size)
+    # legacy tkinter helper (kept for reference) - no-op in terminal mode
+    return
 
 
 # initialize the board
@@ -279,29 +277,82 @@ for x in range(len(Pieces)):
         print(' legal moves:', moves)
 print(' ')
 
-root = tk.Tk()
 
-square_size = 50
+def render_board_terminal(pieces):
+    board = [['.' for _ in range(8)] for _ in range(8)]
+    for p in pieces:
+        c = _col_to_index(p.col)
+        r = _row_to_index(p.row)
+        board[r][c] = piece_unicode(p.name, p.color)
 
-width = height = square_size * 8
-
-chess_canvas = tk.Canvas(root, width=width, height=height)
-chess_canvas.pack()
-
-for row in range(8):
-    for col in range(8):
-        x1 = col * square_size
-        y1 = row * square_size
-        x2 = x1 + square_size
-        y2 = y1 + square_size
-
-        if (row + col) % 2 == 0:
-            chess_canvas.create_rectangle(x1, y1, x2, y2, fill='white')
-        else:
-            chess_canvas.create_rectangle(x1, y1, x2, y2, fill='black')
-
-# draw all pieces from the Pieces list
-draw_all_pieces(chess_canvas, Pieces, square_size)
+    files = 'a b c d e f g h'
+    print('  ' + files)
+    for r in range(8):
+        rank = 8 - r
+        row_str = str(rank) + ' '
+        for c in range(8):
+            row_str += board[r][c] + ' '
+        print(row_str + str(rank))
+    print('  ' + files)
 
 
-root.mainloop()
+def find_piece_by_square(pieces, square):
+    if not square or len(square) < 2:
+        return None
+    col = square[0]
+    row = square[1:]
+    for p in pieces:
+        if p.col == col and str(p.row) == row:
+            return p
+    return None
+
+
+def list_pieces(pieces):
+    for p in pieces:
+        print(p.color, p.name, 'at', p.col + str(p.row))
+
+
+def repl(pieces):
+    print('Terminal chess viewer. Type "help" for commands.')
+    while True:
+        try:
+            cmd = input('> ').strip()
+        except (EOFError, KeyboardInterrupt):
+            print('\nExiting.')
+            break
+        if not cmd:
+            continue
+        if cmd in ('q', 'quit', 'exit'):
+            break
+        if cmd in ('h', 'help'):
+            print('Commands:')
+            print('  board | show        - display board')
+            print('  list                - list all pieces')
+            print('  moves <square>      - show legal moves for piece at square (e.g. moves e2)')
+            print('  quit | q            - exit')
+            continue
+        if cmd in ('board', 'show'):
+            render_board_terminal(pieces)
+            continue
+        if cmd == 'list':
+            list_pieces(pieces)
+            continue
+        if cmd.startswith('moves '):
+            parts = cmd.split()
+            if len(parts) < 2:
+                print('usage: moves <square>')
+                continue
+            sq = parts[1]
+            p = find_piece_by_square(pieces, sq)
+            if p is None:
+                print('No piece at', sq)
+                continue
+            moves = get_piece_legal_moves(pieces, p)
+            print('Legal moves for', p.color, p.name, p.col + str(p.row), ':', moves)
+            continue
+        print('Unknown command. Type "help" for commands.')
+
+
+if __name__ == '__main__':
+    render_board_terminal(Pieces)
+    repl(Pieces)
