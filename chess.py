@@ -178,7 +178,6 @@ def get_pawn_moves(pieces, piece):
                 moves.append(f"{_index_to_col(c)}{_index_to_row(r)}")
 
     # en-passant: can capture a pawn that just moved two squares on the previous move
-    global last_move
     if last_move and last_move.get('double_step'):
         lm_col, lm_row = last_move['to']
         # the double-stepped pawn must be on the same rank as the pawn
@@ -312,20 +311,36 @@ def get_king_moves(pieces, piece):
 
 
 def get_piece_legal_moves(pieces, piece):
+    # generate pseudo-legal moves
     if piece.name == 'Pawn':
-        return get_pawn_moves(pieces, piece)
-    if piece.name == 'Rook':
-        return get_rook_moves(pieces, piece)
-    if piece.name == 'Knight':
-        return get_knight_moves(pieces, piece)
-    if piece.name == 'Bishop':
-        return get_bishop_moves(pieces, piece)
-    if piece.name == 'Queen':
-        return get_queen_moves(pieces, piece)
-    if piece.name == 'King':
-        return get_king_moves(pieces, piece)
-    return []
+        raw = get_pawn_moves(pieces, piece)
+    elif piece.name == 'Rook':
+        raw = get_rook_moves(pieces, piece)
+    elif piece.name == 'Knight':
+        raw = get_knight_moves(pieces, piece)
+    elif piece.name == 'Bishop':
+        raw = get_bishop_moves(pieces, piece)
+    elif piece.name == 'Queen':
+        raw = get_queen_moves(pieces, piece)
+    elif piece.name == 'King':
+        raw = get_king_moves(pieces, piece)
+    else:
+        return []
 
+    # filter out moves that would leave own king in check
+    legal = []
+    for to_sq in raw:
+        from_sq = f"{piece.col}{piece.row}"
+        try:
+            cloned, new_last = simulate_apply_move(pieces, from_sq, to_sq, last_move_local=last_move)
+        except Exception:
+            continue
+        if not is_in_check(cloned, piece.color):
+            legal.append(to_sq)
+    return legal
+
+
+import copy
 
 # --- game state and move application (for en-passant, castling, promotion) ---
 last_move = None  # dict with keys: piece, from, to, double_step
@@ -412,6 +427,92 @@ def apply_move(pieces, from_pos, to_pos, promotion=None):
         double_step = True
 
     last_move = {'piece': mover, 'from': (from_col_idx, from_row_idx), 'to': (to_col_idx, to_row_idx), 'double_step': double_step}
+
+
+def simulate_apply_move(pieces, from_pos, to_pos, last_move_local=None, promotion=None):
+    """Simulate a move on a deep-copied pieces list and return the new pieces and last_move dict.
+    This does not modify global state.
+    """
+    pieces_copy = copy.deepcopy(pieces)
+    # helper to find piece in copy
+    mover = None
+    for p in pieces_copy:
+        if p.col == from_pos[0] and int(p.row) == int(from_pos[1]):
+            mover = p
+            break
+    if mover is None:
+        raise ValueError(f"No piece at {from_pos}")
+
+    from_col_idx = _col_to_index(mover.col)
+    from_row_idx = _row_to_index(mover.row)
+    to_col = to_pos[0]
+    to_row = int(to_pos[1])
+    to_col_idx = _col_to_index(to_col)
+    to_row_idx = _row_to_index(to_row)
+
+    # detect en-passant capture
+    captured = None
+    if mover.name == 'Pawn':
+        if _col_to_index(from_pos[0]) != to_col_idx and find_piece_by_pos(pieces_copy, to_pos) is None:
+            if last_move_local and last_move_local.get('double_step'):
+                lm_to = last_move_local['to']
+                if lm_to[0] == to_col_idx and lm_to[1] == from_row_idx:
+                    captured = _occupied_piece_at(pieces_copy, lm_to[0], lm_to[1])
+    if captured is None:
+        captured = find_piece_by_pos(pieces_copy, to_pos)
+    if captured:
+        pieces_copy.remove(captured)
+
+    # castling: handle rook movement on copy
+    if mover.name == 'King' and abs(to_col_idx - from_col_idx) == 2:
+        if to_col_idx > from_col_idx:
+            rook_col = 'h'
+            rook_target_col = 'f'
+        else:
+            rook_col = 'a'
+            rook_target_col = 'd'
+        rook = None
+        for p in pieces_copy:
+            if p.name == 'Rook' and p.color == mover.color and p.col == rook_col:
+                rook = p
+                break
+        if rook:
+            rook.col = rook_target_col
+            rook.firstMove = False
+
+    # move the piece on the copy
+    mover.col = to_col
+    mover.row = to_row
+    mover.firstMove = False
+
+    # promotion on copy
+    if mover.name == 'Pawn':
+        if (mover.color == 'White' and mover.row == 8) or (mover.color == 'Black' and mover.row == 1):
+            new_name = promotion if promotion in ('Queen', 'Rook', 'Bishop', 'Knight') else 'Queen'
+            mover.name = new_name
+
+    # compute new last_move dict
+    double_step = False
+    if mover.name == 'Pawn' and abs(to_row_idx - from_row_idx) == 2:
+        double_step = True
+
+    new_last = {'piece': mover, 'from': (from_col_idx, from_row_idx), 'to': (to_col_idx, to_row_idx), 'double_step': double_step}
+    return pieces_copy, new_last
+
+
+def is_in_check(pieces, color):
+    # Find king for color and test whether its square is attacked by opponent
+    king = None
+    for p in pieces:
+        if p.name == 'King' and p.color == color:
+            king = p
+            break
+    if king is None:
+        return False
+    kc = _col_to_index(king.col)
+    kr = _row_to_index(king.row)
+    opp = 'Black' if color == 'White' else 'White'
+    return is_square_attacked(pieces, kc, kr, opp)
 
 
 
