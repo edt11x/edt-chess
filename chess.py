@@ -101,6 +101,56 @@ def _occupied_piece_at(pieces, col_idx, row_idx):
     return None
 
 
+def _path_clear_between(pieces, c1, r1, c2, r2):
+    # Check that all squares between (c1,r1) exclusive and (c2,r2) exclusive are empty.
+    dc = 0 if c2 == c1 else (1 if c2 > c1 else -1)
+    dr = 0 if r2 == r1 else (1 if r2 > r1 else -1)
+    c = c1 + dc
+    r = r1 + dr
+    while (c, r) != (c2, r2):
+        if _occupied_piece_at(pieces, c, r) is not None:
+            return False
+        c += dc
+        r += dr
+    return True
+
+
+def is_square_attacked(pieces, col_idx, row_idx, by_color):
+    # Return True if any piece of color `by_color` attacks square (col_idx,row_idx).
+    for p in pieces:
+        if p.color != by_color:
+            continue
+        pc = p.name
+        c = _col_to_index(p.col)
+        r = _row_to_index(p.row)
+        dc = col_idx - c
+        dr = row_idx - r
+        # Pawn attacks
+        if pc == 'Pawn':
+            if p.color == 'White':
+                if dr == -1 and abs(dc) == 1:
+                    return True
+            else:
+                if dr == 1 and abs(dc) == 1:
+                    return True
+        elif pc == 'Knight':
+            if (abs(dc), abs(dr)) in ((1, 2), (2, 1)):
+                return True
+        elif pc == 'Bishop':
+            if abs(dc) == abs(dr) and _path_clear_between(pieces, c, r, col_idx, row_idx):
+                return True
+        elif pc == 'Rook':
+            if (dc == 0 or dr == 0) and _path_clear_between(pieces, c, r, col_idx, row_idx):
+                return True
+        elif pc == 'Queen':
+            if (abs(dc) == abs(dr) or dc == 0 or dr == 0) and _path_clear_between(pieces, c, r, col_idx, row_idx):
+                return True
+        elif pc == 'King':
+            if max(abs(dc), abs(dr)) == 1:
+                return True
+    return False
+
+
 def get_pawn_moves(pieces, piece):
     moves = []
     col = _col_to_index(piece.col)
@@ -126,6 +176,18 @@ def get_pawn_moves(pieces, piece):
             target = _occupied_piece_at(pieces, c, r)
             if target is not None and target.color != piece.color:
                 moves.append(f"{_index_to_col(c)}{_index_to_row(r)}")
+
+    # en-passant: can capture a pawn that just moved two squares on the previous move
+    global last_move
+    if last_move and last_move.get('double_step'):
+        lm_col, lm_row = last_move['to']
+        # the double-stepped pawn must be on the same rank as the pawn
+        if lm_row == row:
+            if abs(lm_col - col) == 1:
+                # capture by moving diagonally behind the pawn
+                capture_row = row + direction
+                if 0 <= capture_row < 8:
+                    moves.append(f"{_index_to_col(lm_col)}{_index_to_row(capture_row)}")
 
     return moves
 
@@ -192,6 +254,60 @@ def get_king_moves(pieces, piece):
                 target = _occupied_piece_at(pieces, c, r)
                 if target is None or target.color != piece.color:
                     moves.append(f"{_index_to_col(c)}{_index_to_row(r)}")
+    # castling: checks (king and rook haven't moved, path clear, and no squares are attacked)
+    if piece.firstMove:
+        opp = 'Black' if piece.color == 'White' else 'White'
+        # white king expected at e1, black at e8
+        if piece.color == 'White' and piece.col == 'e' and piece.row == 1:
+            king_c = col
+            king_r = row
+            # king must not currently be in check
+            if not is_square_attacked(pieces, king_c, king_r, opp):
+                # kingside
+                rook = _occupied_piece_at(pieces, _col_to_index('h'), _row_to_index(1))
+                if rook and rook.name == 'Rook' and rook.firstMove:
+                    f_idx = _col_to_index('f')
+                    g_idx = _col_to_index('g')
+                    r_idx = _row_to_index(1)
+                    if _occupied_piece_at(pieces, f_idx, r_idx) is None and _occupied_piece_at(pieces, g_idx, r_idx) is None:
+                        # squares the king passes through (f1,g1) must not be under attack
+                        if not is_square_attacked(pieces, f_idx, r_idx, opp) and not is_square_attacked(pieces, g_idx, r_idx, opp):
+                            moves.append('g1')
+                # queenside
+                rook = _occupied_piece_at(pieces, _col_to_index('a'), _row_to_index(1))
+                if rook and rook.name == 'Rook' and rook.firstMove:
+                    d_idx = _col_to_index('d')
+                    c_idx = _col_to_index('c')
+                    b_idx = _col_to_index('b')
+                    r_idx = _row_to_index(1)
+                    if _occupied_piece_at(pieces, d_idx, r_idx) is None and _occupied_piece_at(pieces, c_idx, r_idx) is None and _occupied_piece_at(pieces, b_idx, r_idx) is None:
+                        # squares the king passes through (d1,c1) must not be under attack
+                        if not is_square_attacked(pieces, d_idx, r_idx, opp) and not is_square_attacked(pieces, c_idx, r_idx, opp):
+                            moves.append('c1')
+        if piece.color == 'Black' and piece.col == 'e' and piece.row == 8:
+            king_c = col
+            king_r = row
+            if not is_square_attacked(pieces, king_c, king_r, opp):
+                # kingside
+                rook = _occupied_piece_at(pieces, _col_to_index('h'), _row_to_index(8))
+                if rook and rook.name == 'Rook' and rook.firstMove:
+                    f_idx = _col_to_index('f')
+                    g_idx = _col_to_index('g')
+                    r_idx = _row_to_index(8)
+                    if _occupied_piece_at(pieces, f_idx, r_idx) is None and _occupied_piece_at(pieces, g_idx, r_idx) is None:
+                        if not is_square_attacked(pieces, f_idx, r_idx, opp) and not is_square_attacked(pieces, g_idx, r_idx, opp):
+                            moves.append('g8')
+                # queenside
+                rook = _occupied_piece_at(pieces, _col_to_index('a'), _row_to_index(8))
+                if rook and rook.name == 'Rook' and rook.firstMove:
+                    d_idx = _col_to_index('d')
+                    c_idx = _col_to_index('c')
+                    b_idx = _col_to_index('b')
+                    r_idx = _row_to_index(8)
+                    if _occupied_piece_at(pieces, d_idx, r_idx) is None and _occupied_piece_at(pieces, c_idx, r_idx) is None and _occupied_piece_at(pieces, b_idx, r_idx) is None:
+                        if not is_square_attacked(pieces, d_idx, r_idx, opp) and not is_square_attacked(pieces, c_idx, r_idx, opp):
+                            moves.append('c8')
+
     return moves
 
 
@@ -209,6 +325,94 @@ def get_piece_legal_moves(pieces, piece):
     if piece.name == 'King':
         return get_king_moves(pieces, piece)
     return []
+
+
+# --- game state and move application (for en-passant, castling, promotion) ---
+last_move = None  # dict with keys: piece, from, to, double_step
+
+
+def find_piece_by_pos(pieces, pos):
+    # pos like 'e2'
+    if len(pos) < 2:
+        return None
+    col = pos[0]
+    row = int(pos[1])
+    for p in pieces:
+        if p.col == col and int(p.row) == row:
+            return p
+    return None
+
+
+def apply_move(pieces, from_pos, to_pos, promotion=None):
+    # Move a piece from from_pos (e.g. 'e2') to to_pos (e.g. 'e4').
+    # Handles captures, en-passant, castling, and promotion (default to Queen).
+    global last_move
+    mover = find_piece_by_pos(pieces, from_pos)
+    if mover is None:
+        raise ValueError(f"No piece at {from_pos}")
+
+    from_col_idx = _col_to_index(mover.col)
+    from_row_idx = _row_to_index(mover.row)
+
+    to_col = to_pos[0]
+    to_row = int(to_pos[1])
+    to_col_idx = _col_to_index(to_col)
+    to_row_idx = _row_to_index(to_row)
+
+    # detect en-passant capture: pawn moves diagonally to empty square
+    captured = None
+    if mover.name == 'Pawn':
+        # en-passant target square is empty but we capture the pawn that moved two squares last move
+        if _col_to_index(from_pos[0]) != to_col_idx and find_piece_by_pos(pieces, to_pos) is None:
+            # diagonal move into empty square
+            if last_move and last_move.get('double_step'):
+                lm_to = last_move['to']
+                if lm_to[0] == to_col_idx and lm_to[1] == from_row_idx:
+                    # capture the pawn that made the double step
+                    captured = _occupied_piece_at(pieces, lm_to[0], lm_to[1])
+    # normal capture
+    if captured is None:
+        captured = find_piece_by_pos(pieces, to_pos)
+    if captured:
+        pieces.remove(captured)
+
+    # handle castling: king moves two squares horizontally
+    if mover.name == 'King' and abs(to_col_idx - from_col_idx) == 2:
+        # kingside or queenside
+        if to_col_idx > from_col_idx:
+            # kingside: move rook from h-file to f-file
+            rook_col = 'h'
+            rook_target_col = 'f'
+        else:
+            rook_col = 'a'
+            rook_target_col = 'd'
+        rook = None
+        for p in pieces:
+            if p.name == 'Rook' and p.color == mover.color and p.col == rook_col:
+                rook = p
+                break
+        if rook:
+            rook.col = rook_target_col
+            rook.firstMove = False
+
+    # move the piece
+    mover.col = to_col
+    mover.row = to_row
+    mover.firstMove = False
+
+    # promotion
+    if mover.name == 'Pawn':
+        if (mover.color == 'White' and mover.row == 8) or (mover.color == 'Black' and mover.row == 1):
+            new_name = promotion if promotion in ('Queen', 'Rook', 'Bishop', 'Knight') else 'Queen'
+            mover.name = new_name
+
+    # record last_move
+    double_step = False
+    if mover.name == 'Pawn' and abs(to_row_idx - from_row_idx) == 2:
+        double_step = True
+
+    last_move = {'piece': mover, 'from': (from_col_idx, from_row_idx), 'to': (to_col_idx, to_row_idx), 'double_step': double_step}
+
 
 
 def piece_unicode(name, color):
