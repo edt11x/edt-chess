@@ -1,6 +1,14 @@
 #
 import tkinter as tk
 
+# turn constants and state
+WHITE = 'White'
+BLACK = 'Black'
+current_turn = WHITE
+
+def switch_turn():
+    global current_turn
+    current_turn = BLACK if current_turn == WHITE else WHITE
 
 class Piece:
     def __init__(self, color, name, col, row):
@@ -366,6 +374,61 @@ def apply_move(pieces, from_pos, to_pos, promotion=None):
     if mover is None:
         raise ValueError(f"No piece at {from_pos}")
 
+    # enforce turn-taking
+    if mover.color != current_turn:
+        raise ValueError(f"It's {current_turn}'s turn")
+
+    # helper to format a simple SAN-like notation for the move
+    def _format_move_san(before_pieces, mover, captured, from_pos, to_pos, promotion):
+        # castling
+        from_c = _col_to_index(from_pos[0])
+        to_c = _col_to_index(to_pos[0])
+        if mover.name == 'King' and abs(to_c - from_c) == 2:
+            return 'O-O' if to_c > from_c else 'O-O-O'
+
+        piece_letter_map = {'King': 'K', 'Queen': 'Q', 'Rook': 'R', 'Bishop': 'B', 'Knight': 'N', 'Pawn': ''}
+        letter = piece_letter_map.get(mover.name, '')
+
+        capture = captured is not None
+
+        # disambiguation: check if another piece of same type can move to to_pos
+        disamb = ''
+        if mover.name != 'Pawn':
+            others = []
+            for p in before_pieces:
+                if p is mover:
+                    continue
+                if p.color == mover.color and p.name == mover.name:
+                    moves = get_piece_legal_moves(before_pieces, p)
+                    if to_pos in moves:
+                        others.append(p)
+            if others:
+                # try file disambiguation
+                from_file = from_pos[0]
+                from_rank = from_pos[1]
+                files_conflict = any(p.col == from_file for p in others)
+                ranks_conflict = any(str(p.row) == from_rank for p in others)
+                if not files_conflict:
+                    disamb = from_file
+                elif not ranks_conflict:
+                    disamb = from_rank
+                else:
+                    disamb = from_file + from_rank
+
+        if mover.name == 'Pawn':
+            if capture:
+                san = f"{from_pos[0]}x{to_pos}"
+            else:
+                san = f"{to_pos}"
+        else:
+            san = f"{letter}{disamb}{'x' if capture else ''}{to_pos}"
+
+        # promotion
+        if promotion:
+            san += f"={promotion}"
+
+        return san
+
     from_col_idx = _col_to_index(mover.col)
     from_row_idx = _row_to_index(mover.row)
 
@@ -427,6 +490,33 @@ def apply_move(pieces, from_pos, to_pos, promotion=None):
         double_step = True
 
     last_move = {'piece': mover, 'from': (from_col_idx, from_row_idx), 'to': (to_col_idx, to_row_idx), 'double_step': double_step}
+
+    # switch turn after a successful move
+    switch_turn()
+
+    # print move in simple SAN to console
+    try:
+        # captured may have been removed from list; we preserved it earlier in variable `captured`
+        san = _format_move_san(Pieces, mover, captured, from_pos, to_pos, promotion)
+        # check for check / checkmate on opponent
+        opponent = BLACK if mover.color == WHITE else WHITE
+        if is_in_check(Pieces, opponent):
+            # see if opponent has any legal moves
+            has_moves = False
+            for p in Pieces:
+                if p.color != opponent:
+                    continue
+                if get_piece_legal_moves(Pieces, p):
+                    has_moves = True
+                    break
+            if has_moves:
+                san += '+'
+            else:
+                san += '#'
+        print(f"{mover.color}: {san}")
+    except Exception:
+        # don't let SAN printing break the game
+        pass
 
 
 def simulate_apply_move(pieces, from_pos, to_pos, last_move_local=None, promotion=None):
@@ -608,5 +698,60 @@ for row in range(8):
 # draw all pieces from the Pieces list
 draw_all_pieces(chess_canvas, Pieces, square_size)
 
+# GUI state for mouse interaction
+selected_from = None
+
+# status label showing current turn / messages
+status_label = tk.Label(root, text=f"Turn: {current_turn}")
+status_label.pack()
+
+def coords_to_square(x, y):
+    col_idx = int(x // square_size)
+    row_idx = int(y // square_size)
+    if not (0 <= col_idx < 8 and 0 <= row_idx < 8):
+        return None
+    return f"{_index_to_col(col_idx)}{_index_to_row(row_idx)}"
+
+def on_canvas_click(event):
+    global selected_from
+    pos = coords_to_square(event.x, event.y)
+    if pos is None:
+        return
+
+    if selected_from is None:
+        piece = find_piece_by_pos(Pieces, pos)
+        if piece is None:
+            status_label.config(text=f"No piece at {pos}")
+            return
+        if piece.color != current_turn:
+            status_label.config(text=f"It's {current_turn}'s turn")
+            return
+        selected_from = pos
+        # highlight selected square
+        cidx = _col_to_index(pos[0])
+        ridx = _row_to_index(int(pos[1]))
+        x1 = cidx * square_size
+        y1 = ridx * square_size
+        x2 = x1 + square_size
+        y2 = y1 + square_size
+        chess_canvas.delete('sel')
+        chess_canvas.create_rectangle(x1, y1, x2, y2, outline='red', width=3, tags=('sel',))
+        status_label.config(text=f"Selected {pos} — {current_turn}'s turn")
+    else:
+        # attempt to move from selected_from to pos
+        try:
+            apply_move(Pieces, selected_from, pos)
+        except Exception as e:
+            status_label.config(text=str(e))
+            chess_canvas.delete('sel')
+            selected_from = None
+            return
+        # successful move: redraw and update status
+        draw_all_pieces(chess_canvas, Pieces, square_size)
+        chess_canvas.delete('sel')
+        selected_from = None
+        status_label.config(text=f"Turn: {current_turn}")
+
+chess_canvas.bind('<Button-1>', on_canvas_click)
 
 root.mainloop()
