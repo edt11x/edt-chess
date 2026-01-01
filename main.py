@@ -2,6 +2,8 @@
 import sys
 import io
 import unittest
+import chess
+import sunfish
 
 
 class Piece:
@@ -249,53 +251,13 @@ def draw_all_pieces(canvas, pieces, square_size):
 
 
 # initialize the board
-Pieces = []
-initPositions(Pieces, 'White', 'Pawn', 'abcdefgh', 2)
-initPositions(Pieces, 'White', 'Rook', 'ah', 1)
-initPositions(Pieces, 'White', 'Knight', 'bg', 1)
-initPositions(Pieces, 'White', 'Bishop', 'cf', 1)
-initPositions(Pieces, 'White', 'Queen', 'd', 1)
-initPositions(Pieces, 'White', 'King', 'e', 1)
-
-initPositions(Pieces, 'Black', 'Pawn', 'abcdefgh', 7)
-initPositions(Pieces, 'Black', 'Rook', 'ah', 8)
-initPositions(Pieces, 'Black', 'Knight', 'bg', 8)
-initPositions(Pieces, 'Black', 'Bishop', 'cf', 8)
-initPositions(Pieces, 'Black', 'Queen', 'd', 8)
-initPositions(Pieces, 'Black', 'King', 'e', 8)
-
-# Print positions of white pawns, to test the initialization
-for x in range(len(Pieces)):
-    if ((Pieces[x].name == 'Pawn') and (Pieces[x].color == 'White')):
-        Pieces[x].printPosition()
-        moves = get_piece_legal_moves(Pieces, Pieces[x])
-        print(' legal moves:', moves)
-print(' ')
-# Print positions of black pawns, to test the initialization
-for x in range(len(Pieces)):
-    if ((Pieces[x].name == 'Pawn') and (Pieces[x].color == 'Black')):
-        Pieces[x].printPosition()
-        moves = get_piece_legal_moves(Pieces, Pieces[x])
-        print(' legal moves:', moves)
-print(' ')
+board = chess.Board()
 
 
-def render_board_terminal(pieces):
-    board = [['.' for _ in range(8)] for _ in range(8)]
-    for p in pieces:
-        c = _col_to_index(p.col)
-        r = _row_to_index(p.row)
-        board[r][c] = piece_unicode(p.name, p.color)
 
-    files = 'a b c d e f g h'
-    print('  ' + files)
-    for r in range(8):
-        rank = 8 - r
-        row_str = str(rank) + ' '
-        for c in range(8):
-            row_str += board[r][c] + ' '
-        print(row_str + str(rank))
-    print('  ' + files)
+def render_board_terminal(board):
+    display = board.__str__()
+    print(display)
 
 
 def run_unit_tests():
@@ -339,9 +301,24 @@ def ask_player_color():
         print('Please enter W (White) or B (Black).')
 
 
-def repl(pieces, player_color):
-    print(f'Terminal chess viewer. You are playing {player_color}. Type "help" for commands.')
+def repl(board, player_color):
+    print(f'Terminal chess viewer. You are playing {player_color}. Computer plays as {"Black" if player_color == "White" else "White"}. Type "help" for commands.')
+    computer_color = chess.BLACK if player_color == 'White' else chess.WHITE
     while True:
+        if board.turn == computer_color:
+            print("Computer's turn...")
+            move = sunfish.get_computer_move(board)
+            if move:
+                board.push(move)
+                print(f'Computer plays {move}')
+                render_board_terminal(board)
+            else:
+                print('No moves available.')
+                break
+            if board.is_game_over():
+                print('Game over.')
+                break
+            continue
         try:
             cmd = input('> ').strip()
         except (EOFError, KeyboardInterrupt):
@@ -354,15 +331,12 @@ def repl(pieces, player_color):
         if cmd in ('h', 'help'):
             print('Commands:')
             print('  board | show        - display board')
-            print('  list                - list all pieces')
             print('  moves <square>      - show legal moves for piece at square (e.g. moves e2)')
+            print('  move <from> <to>    - make a move (e.g. move e2 e4)')
             print('  quit | q            - exit')
             continue
         if cmd in ('board', 'show'):
-            render_board_terminal(pieces)
-            continue
-        if cmd == 'list':
-            list_pieces(pieces)
+            render_board_terminal(board)
             continue
         if cmd.startswith('moves '):
             parts = cmd.split()
@@ -370,12 +344,40 @@ def repl(pieces, player_color):
                 print('usage: moves <square>')
                 continue
             sq = parts[1]
-            p = find_piece_by_square(pieces, sq)
-            if p is None:
+            try:
+                square = chess.parse_square(sq)
+            except ValueError:
+                print('Invalid square:', sq)
+                continue
+            if board.piece_at(square) is None:
                 print('No piece at', sq)
                 continue
-            moves = get_piece_legal_moves(pieces, p)
-            print('Legal moves for', p.color, p.name, p.col + str(p.row), ':', moves)
+            moves = [chess.square_name(move.to_square) for move in board.generate_legal_moves() if move.from_square == square]
+            piece = board.piece_at(square)
+            piece_name = chess.piece_name(piece.piece_type)
+            color = 'White' if piece.color else 'Black'
+            print('Legal moves for', color, piece_name, sq, ':', moves)
+            continue
+        if cmd.startswith('move '):
+            parts = cmd.split()
+            if len(parts) < 3:
+                print('usage: move <from> <to>')
+                continue
+            from_sq, to_sq = parts[1], parts[2]
+            try:
+                move = chess.Move.from_uci(from_sq + to_sq)
+            except ValueError:
+                print('Invalid move:', from_sq, to_sq)
+                continue
+            if move not in board.legal_moves:
+                print('Illegal move:', move)
+                continue
+            board.push(move)
+            print(f'You played {move}')
+            render_board_terminal(board)
+            if board.is_game_over():
+                print('Game over.')
+                break
             continue
         print('Unknown command. Type "help" for commands.')
 
@@ -389,9 +391,9 @@ if __name__ == '__main__':
         print('=== SUMMARY ===')
         print(f"Ran: {result.testsRun}, Failures: {len(result.failures)}, Errors: {len(result.errors)}")
         print('\nShowing board after tests:\n')
-        render_board_terminal(Pieces)
+        render_board_terminal(board)
         # continue into REPL after showing results
 
     player_color = ask_player_color()
-    render_board_terminal(Pieces)
-    repl(Pieces, player_color)
+    render_board_terminal(board)
+    repl(board, player_color)
