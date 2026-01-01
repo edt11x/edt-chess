@@ -1,5 +1,7 @@
 #
 import sys
+import io
+import unittest
 
 
 class Piece:
@@ -296,6 +298,16 @@ def render_board_terminal(pieces):
     print('  ' + files)
 
 
+def run_unit_tests():
+    """Run unit tests under the `tests` directory and return the textual output."""
+    loader = unittest.TestLoader()
+    suite = loader.discover(start_dir='tests', pattern='test_*.py')
+    buf = io.StringIO()
+    runner = unittest.TextTestRunner(stream=buf, verbosity=2)
+    result = runner.run(suite)
+    return buf.getvalue(), result
+
+
 def find_piece_by_square(pieces, square):
     if not square or len(square) < 2:
         return None
@@ -369,6 +381,17 @@ def repl(pieces, player_color):
 
 
 if __name__ == '__main__':
+    # If invoked with --run-tests, run unit tests and display results above the board
+    if '--run-tests' in sys.argv or '--test' in sys.argv:
+        output, result = run_unit_tests()
+        print('\n=== UNIT TEST OUTPUT ===')
+        print(output)
+        print('=== SUMMARY ===')
+        print(f"Ran: {result.testsRun}, Failures: {len(result.failures)}, Errors: {len(result.errors)}")
+        print('\nShowing board after tests:\n')
+        render_board_terminal(Pieces)
+        # continue into REPL after showing results
+
     player_color = ask_player_color()
     render_board_terminal(Pieces)
     repl(Pieces, player_color)
