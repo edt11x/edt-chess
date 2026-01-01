@@ -1,51 +1,67 @@
 import unittest
 import chess
-import sunfish
+from game import ChessGame
+from ai import ChessAI
 
 
 class TestChessIntegration(unittest.TestCase):
-    def test_board_initialization(self):
-        board = chess.Board()
-        self.assertEqual(board.fen(), chess.STARTING_FEN)
+    def test_game_initialization(self):
+        game = ChessGame()
+        self.assertEqual(game.board.fen(), chess.STARTING_FEN)
 
     def test_legal_moves_generation(self):
-        board = chess.Board()
-        moves = list(board.legal_moves)
-        self.assertGreater(len(moves), 0)
-        # e2e4 should be legal
-        e2e4 = chess.Move.from_uci('e2e4')
-        self.assertIn(e2e4, moves)
+        game = ChessGame()
+        moves = game.get_legal_moves_for_square('e2')
+        self.assertIn('e3', moves)
+        self.assertIn('e4', moves)
 
     def test_user_move_application(self):
-        board = chess.Board()
-        move = chess.Move.from_uci('e2e4')
-        board.push(move)
-        self.assertEqual(board.piece_at(chess.E4), chess.Piece(chess.PAWN, chess.WHITE))
-        self.assertIsNone(board.piece_at(chess.E2))
+        game = ChessGame()
+        success = game.make_move('e2e4')
+        self.assertTrue(success)
+        self.assertEqual(game.board.piece_at(chess.E4), chess.Piece(chess.PAWN, chess.WHITE))
+        self.assertIsNone(game.board.piece_at(chess.E2))
 
     def test_computer_move_ai(self):
-        board = chess.Board()
+        game = ChessGame()
+        ai = ChessAI()
         # Make a user move
-        board.push(chess.Move.from_uci('e2e4'))
+        game.make_move('e2e4')
         # Computer should find a move
-        move = sunfish.get_computer_move(board)
+        move = ai.get_best_move(game.board)
         self.assertIsNotNone(move)
-        self.assertIn(move, board.legal_moves)
+        self.assertIn(move, game.board.legal_moves)
 
     def test_game_over_detection(self):
-        board = chess.Board()
+        game = ChessGame()
         # Fool's mate
-        board.push(chess.Move.from_uci('f2f3'))
-        board.push(chess.Move.from_uci('e7e5'))
-        board.push(chess.Move.from_uci('g2g4'))
-        board.push(chess.Move.from_uci('d8h4'))
-        self.assertTrue(board.is_checkmate())
+        game.make_move('f2f3')
+        game.make_move('e7e5')
+        game.make_move('g2g4')
+        game.make_move('d8h4')
+        self.assertTrue(game.is_game_over())
+        self.assertEqual(game.get_winner(), 'Black')
 
     def test_turn_switching(self):
-        board = chess.Board()
-        self.assertEqual(board.turn, chess.WHITE)
-        board.push(chess.Move.from_uci('e2e4'))
-        self.assertEqual(board.turn, chess.BLACK)
+        game = ChessGame()
+        self.assertEqual(game.get_current_turn(), 'White')
+        game.make_move('e2e4')
+        self.assertEqual(game.get_current_turn(), 'Black')
+
+    def test_hint_functionality(self):
+        game = ChessGame()
+        ai = ChessAI()
+        hint = ai.get_hint(game.board)
+        self.assertIsNotNone(hint)
+        self.assertIn(hint['move'], game.board.legal_moves)
+
+    def test_undo_functionality(self):
+        game = ChessGame()
+        original_fen = game.board.fen()
+        game.make_move('e2e4')
+        self.assertNotEqual(game.board.fen(), original_fen)
+        game.undo_move()
+        self.assertEqual(game.board.fen(), original_fen)
 
 
 if __name__ == '__main__':
