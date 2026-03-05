@@ -11,6 +11,85 @@ PIECE_VALUES = {
 }
 
 
+def _make_pst(table):
+    """Convert a visually-defined PST (rank 8 at index 0) to python-chess
+    square ordering (A1=0 at index 0). For a Black piece at square sq,
+    look up PST[sq ^ 56] to mirror the board vertically."""
+    result = [0] * 64
+    for sq in range(64):
+        rank, file = sq // 8, sq % 8
+        visual_idx = (7 - rank) * 8 + file
+        result[sq] = table[visual_idx]
+    return result
+
+
+# Piece-square tables based on the simplified evaluation function from
+# https://www.chessprogramming.org/Simplified_Evaluation_Function
+# Each table is from White's perspective with rank 8 at the top.
+PST = {
+    chess.PAWN: _make_pst([
+         0,  0,  0,  0,  0,  0,  0,  0,
+        50, 50, 50, 50, 50, 50, 50, 50,
+        10, 10, 20, 30, 30, 20, 10, 10,
+         5,  5, 10, 25, 25, 10,  5,  5,
+         0,  0,  0, 20, 20,  0,  0,  0,
+         5, -5,-10,  0,  0,-10, -5,  5,
+         5, 10, 10,-20,-20, 10, 10,  5,
+         0,  0,  0,  0,  0,  0,  0,  0,
+    ]),
+    chess.KNIGHT: _make_pst([
+        -50,-40,-30,-30,-30,-30,-40,-50,
+        -40,-20,  0,  0,  0,  0,-20,-40,
+        -30,  0, 10, 15, 15, 10,  0,-30,
+        -30,  5, 15, 20, 20, 15,  5,-30,
+        -30,  0, 15, 20, 20, 15,  0,-30,
+        -30,  5, 10, 15, 15, 10,  5,-30,
+        -40,-20,  0,  5,  5,  0,-20,-40,
+        -50,-40,-30,-30,-30,-30,-40,-50,
+    ]),
+    chess.BISHOP: _make_pst([
+        -20,-10,-10,-10,-10,-10,-10,-20,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -10,  0,  5, 10, 10,  5,  0,-10,
+        -10,  5,  5, 10, 10,  5,  5,-10,
+        -10,  0, 10, 10, 10, 10,  0,-10,
+        -10, 10, 10, 10, 10, 10, 10,-10,
+        -10,  5,  0,  0,  0,  0,  5,-10,
+        -20,-10,-10,-10,-10,-10,-10,-20,
+    ]),
+    chess.ROOK: _make_pst([
+         0,  0,  0,  0,  0,  0,  0,  0,
+         5, 10, 10, 10, 10, 10, 10,  5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+        -5,  0,  0,  0,  0,  0,  0, -5,
+         0,  0,  0,  5,  5,  0,  0,  0,
+    ]),
+    chess.QUEEN: _make_pst([
+        -20,-10,-10, -5, -5,-10,-10,-20,
+        -10,  0,  0,  0,  0,  0,  0,-10,
+        -10,  0,  5,  5,  5,  5,  0,-10,
+         -5,  0,  5,  5,  5,  5,  0, -5,
+          0,  0,  5,  5,  5,  5,  0, -5,
+        -10,  5,  5,  5,  5,  5,  0,-10,
+        -10,  0,  5,  0,  0,  0,  0,-10,
+        -20,-10,-10, -5, -5,-10,-10,-20,
+    ]),
+    chess.KING: _make_pst([
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -30,-40,-40,-50,-50,-40,-40,-30,
+        -20,-30,-30,-40,-40,-30,-30,-20,
+        -10,-20,-20,-20,-20,-20,-20,-10,
+         20, 20,  0,  0,  0,  0, 20, 20,
+         20, 30, 10,  0,  0, 10, 30, 20,
+    ]),
+}
+
+
 class ChessAI:
     def __init__(self, depth=3):
         self.depth = depth
@@ -26,7 +105,8 @@ class ChessAI:
         for square in chess.SQUARES:
             piece = board.piece_at(square)
             if piece:
-                value = PIECE_VALUES[piece.piece_type]
+                pst_sq = square if piece.color == chess.WHITE else square ^ 56
+                value = PIECE_VALUES[piece.piece_type] + PST[piece.piece_type][pst_sq]
                 score += value if piece.color == board.turn else -value
         return score
 
