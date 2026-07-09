@@ -1,0 +1,31 @@
+[package]
+name = "edt-chess"
+version = "0.2.0"
+edition = "2021"
+description = "Graphical chess practice application for Linux (Rust + Slint)"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/edt11x/edt-chess"
+keywords = ["chess", "slint", "gui", "practice"]
+categories = ["games", "gui"]
+default-run = "edt-chess"
+
+[lib]
+name = "edt_chess"
+path = "src/lib.rs"
+
+[[bin]]
+name = "edt-chess"
+path = "src/main.rs"
+
+[dependencies]
+slint = "1.17"
+shakmaty = "0.30"
+
+[build-dependencies]
+slint-build = "1.17"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true

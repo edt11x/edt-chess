@@ -1,6 +1,0 @@
-services:
-  edtchess:
-    image: edtchess
-    build:
-      context: .
-      dockerfile: ./Dockerfile

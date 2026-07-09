@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=edt-chess
+GenericName=Chess Practice
+Comment=Graphical chess practice application (Rust + Slint)
+Exec=edt-chess
+Icon=applications-games
+Terminal=false
+Categories=Game;BoardGame;
+Keywords=chess;practice;ai;
+StartupNotify=true

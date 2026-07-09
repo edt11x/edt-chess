@@ -1,0 +1,376 @@
+import { Button, VerticalBox, HorizontalBox, ScrollView, ComboBox } from "std-widgets.slint";
+
+export struct SquareData {
+    piece: string,
+    is-light: bool,
+    is-selected: bool,
+    is-target: bool,
+    is-last-move: bool,
+    index: int,
+}
+
+export component AppWindow inherits Window {
+    title: "edt-chess — Chess Practice";
+    preferred-width: 920px;
+    preferred-height: 680px;
+    min-width: 720px;
+    min-height: 560px;
+    background: #1a1d23;
+
+    // --- Bound from Rust ---
+    in-out property <[SquareData]> squares: [];
+    in property <string> status-text: "White to move";
+    in property <string> eval-text: "Eval: —";
+    in property <string> last-move-text: "";
+    in property <string> hint-text: "";
+    in property <string> player-color-text: "You: White";
+    in property <bool> show-color-picker: true;
+    in property <bool> ai-thinking: false;
+    in property <bool> board-flipped: false;
+    in property <string> difficulty: "medium";
+
+    callback square-clicked(int);
+    callback new-game();
+    callback undo();
+    callback hint();
+    callback choose-color(string);
+    callback set-difficulty(string);
+
+    // Board + side panel
+    HorizontalBox {
+        padding: 16px;
+        spacing: 20px;
+
+        // Chessboard area
+        VerticalBox {
+            spacing: 8px;
+            alignment: center;
+
+            // File labels top (when flipped show h-a)
+            HorizontalBox {
+                spacing: 0;
+                width: 560px;
+                for label[i] in board-flipped
+                    ? ["h", "g", "f", "e", "d", "c", "b", "a"]
+                    : ["a", "b", "c", "d", "e", "f", "g", "h"]
+                : Text {
+                    width: 70px;
+                    horizontal-alignment: center;
+                    color: #8b919a;
+                    font-size: 12px;
+                    text: label;
+                }
+            }
+
+            HorizontalBox {
+                spacing: 4px;
+                alignment: center;
+
+                // Rank labels
+                VerticalBox {
+                    spacing: 0;
+                    width: 18px;
+                    for label[i] in board-flipped
+                        ? ["1", "2", "3", "4", "5", "6", "7", "8"]
+                        : ["8", "7", "6", "5", "4", "3", "2", "1"]
+                    : Text {
+                        height: 70px;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                        color: #8b919a;
+                        font-size: 12px;
+                        text: label;
+                    }
+                }
+
+                // 8x8 board
+                Rectangle {
+                    width: 560px;
+                    height: 560px;
+                    border-radius: 6px;
+                    background: #0f1115;
+                    clip: true;
+
+                    VerticalBox {
+                        padding: 0;
+                        spacing: 0;
+                        for row[r] in [0, 1, 2, 3, 4, 5, 6, 7] : HorizontalBox {
+                            padding: 0;
+                            spacing: 0;
+                            height: 70px;
+                            for col[c] in [0, 1, 2, 3, 4, 5, 6, 7] : Rectangle {
+                                width: 70px;
+                                height: 70px;
+                                property <int> visual-row: r;
+                                property <int> visual-col: c;
+                                // Map visual position to square index (a1=0 … h8=63)
+                                property <int> sq-index: board-flipped
+                                    ? (r * 8 + (7 - c))
+                                    : ((7 - r) * 8 + c);
+                                property <SquareData> data: squares[sq-index];
+
+                                background: data.is-selected
+                                    ? #6b9bd1
+                                    : data.is-last-move
+                                        ? #c9a22755
+                                        : data.is-light ? #e8edf2 : #4a6fa5;
+
+                                // Legal-move target ring
+                                if data.is-target : Rectangle {
+                                    width: data.piece == "" ? 18px : 62px;
+                                    height: data.piece == "" ? 18px : 62px;
+                                    border-radius: data.piece == "" ? 9px : 4px;
+                                    background: data.piece == "" ? #2d6a4f88 : transparent;
+                                    border-width: data.piece == "" ? 0 : 3px;
+                                    border-color: #2d6a4fcc;
+                                }
+
+                                Text {
+                                    width: 100%;
+                                    height: 100%;
+                                    text: data.piece;
+                                    font-size: 42px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                    color: #111;
+                                }
+
+                                TouchArea {
+                                    clicked => {
+                                        root.square-clicked(sq-index);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Dim overlay while AI thinks
+                    if ai-thinking : Rectangle {
+                        background: #00000055;
+                        Text {
+                            text: "Thinking…";
+                            color: white;
+                            font-size: 22px;
+                            font-weight: 600;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            width: 100%;
+                            height: 100%;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Side panel
+        VerticalBox {
+            spacing: 12px;
+            width: 280px;
+
+            Text {
+                text: "Chess Practice";
+                color: #f0f3f7;
+                font-size: 22px;
+                font-weight: 700;
+            }
+
+            Text {
+                text: player-color-text;
+                color: #a8b0bb;
+                font-size: 14px;
+            }
+
+            Rectangle {
+                background: #252a33;
+                border-radius: 8px;
+                height: 72px;
+                VerticalBox {
+                    padding: 12px;
+                    spacing: 4px;
+                    Text {
+                        text: status-text;
+                        color: #f0f3f7;
+                        font-size: 16px;
+                        font-weight: 600;
+                        wrap: word-wrap;
+                    }
+                    Text {
+                        text: last-move-text;
+                        color: #8b919a;
+                        font-size: 13px;
+                    }
+                }
+            }
+
+            Rectangle {
+                background: #252a33;
+                border-radius: 8px;
+                height: 48px;
+                HorizontalBox {
+                    padding: 12px;
+                    Text {
+                        text: eval-text;
+                        color: #c9d1d9;
+                        font-size: 14px;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            if hint-text != "" : Rectangle {
+                background: #1e3a2f;
+                border-radius: 8px;
+                height: 56px;
+                HorizontalBox {
+                    padding: 12px;
+                    Text {
+                        text: hint-text;
+                        color: #7dcea0;
+                        font-size: 14px;
+                        wrap: word-wrap;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            Text {
+                text: "Difficulty";
+                color: #8b919a;
+                font-size: 12px;
+            }
+
+            HorizontalBox {
+                spacing: 8px;
+                Button {
+                    text: "Easy";
+                    enabled: !ai-thinking && !show-color-picker;
+                    primary: difficulty == "easy";
+                    clicked => { root.set-difficulty("easy"); }
+                }
+                Button {
+                    text: "Medium";
+                    enabled: !ai-thinking && !show-color-picker;
+                    primary: difficulty == "medium";
+                    clicked => { root.set-difficulty("medium"); }
+                }
+                Button {
+                    text: "Hard";
+                    enabled: !ai-thinking && !show-color-picker;
+                    primary: difficulty == "hard";
+                    clicked => { root.set-difficulty("hard"); }
+                }
+            }
+
+            VerticalBox {
+                spacing: 8px;
+                Button {
+                    text: "Hint";
+                    enabled: !ai-thinking && !show-color-picker;
+                    clicked => { root.hint(); }
+                }
+                Button {
+                    text: "Undo";
+                    enabled: !ai-thinking && !show-color-picker;
+                    clicked => { root.undo(); }
+                }
+                Button {
+                    text: "New Game";
+                    enabled: !ai-thinking;
+                    clicked => { root.new-game(); }
+                }
+            }
+
+            Rectangle { height: 1px; background: transparent; }
+
+            Text {
+                text: "Click a piece, then a destination square. Promotion defaults to queen.";
+                color: #6b7280;
+                font-size: 12px;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    // Color picker overlay at start / new game
+    if show-color-picker : Rectangle {
+        background: #0f1115ee;
+        width: 100%;
+        height: 100%;
+
+        VerticalBox {
+            alignment: center;
+            spacing: 20px;
+
+            Text {
+                text: "Play as…";
+                color: white;
+                font-size: 28px;
+                font-weight: 700;
+                horizontal-alignment: center;
+            }
+
+            HorizontalBox {
+                alignment: center;
+                spacing: 24px;
+
+                TouchArea {
+                    width: 160px;
+                    height: 160px;
+                    clicked => { root.choose-color("white"); }
+                    Rectangle {
+                        border-radius: 12px;
+                        background: #e8edf2;
+                        border-width: parent.has-hover ? 3px : 0;
+                        border-color: #6b9bd1;
+                        VerticalBox {
+                            alignment: center;
+                            spacing: 8px;
+                            Text {
+                                text: "♔";
+                                font-size: 56px;
+                                horizontal-alignment: center;
+                                color: #111;
+                            }
+                            Text {
+                                text: "White";
+                                font-size: 18px;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                                color: #111;
+                            }
+                        }
+                    }
+                }
+
+                TouchArea {
+                    width: 160px;
+                    height: 160px;
+                    clicked => { root.choose-color("black"); }
+                    Rectangle {
+                        border-radius: 12px;
+                        background: #2a2f38;
+                        border-width: parent.has-hover ? 3px : 0;
+                        border-color: #6b9bd1;
+                        VerticalBox {
+                            alignment: center;
+                            spacing: 8px;
+                            Text {
+                                text: "♚";
+                                font-size: 56px;
+                                horizontal-alignment: center;
+                                color: #f0f3f7;
+                            }
+                            Text {
+                                text: "Black";
+                                font-size: 18px;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                                color: #f0f3f7;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
