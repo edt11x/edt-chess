@@ -35,4 +35,12 @@ Not automated. Recommended next steps:
 
 ## CI artifacts
 
-GitHub Actions uploads `target/release/edt-chess` as a workflow artifact on each push/PR.
+CI workflow template: `packaging/github-actions-ci.yml`.
+
+```bash
+mkdir -p .github/workflows
+cp packaging/github-actions-ci.yml .github/workflows/ci.yml
+# commit & push with a token that has the `workflow` scope
+```
+
+When enabled, the workflow uploads `target/release/edt-chess` as an artifact.

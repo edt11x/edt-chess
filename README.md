@@ -56,7 +56,8 @@ See [packaging/README.md](packaging/README.md) for Flatpak draft and future .deb
 cargo test
 ```
 
-GitHub Actions: [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs tests and a release build on Linux.
+GitHub Actions template: [`packaging/github-actions-ci.yml`](packaging/github-actions-ci.yml).  
+Copy it to `.github/workflows/ci.yml` when your GitHub token has the `workflow` scope (or paste via the GitHub UI).
 
 ## Project layout
 
