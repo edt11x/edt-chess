@@ -2,7 +2,7 @@
 
 ## Project
 
-Linux chess practice GUI: **Rust + Slint + shakmaty**. Branch of interest: `slint`.
+Linux chess practice GUI: **Rust + Slint + shakmaty**. Branch of interest: `slint`. Current version: see `Cargo.toml` (0.3.x feature set includes promotion, PGN, themes, openings, tactics, CI).
 
 ## Canonical workflows
 

@@ -1,0 +1,32 @@
+# Flatpak manifest draft for edt-chess.
+# Build (requires flatpak-builder):
+#   flatpak-builder --user --install build-dir packaging/flatpak/com.github.edt11x.edt_chess.yml
+#
+# This is a starting point; adjust runtime version and module sources as needed.
+
+app-id: com.github.edt11x.edt_chess
+runtime: org.freedesktop.Platform
+runtime-version: '24.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: edt-chess
+finish-args:
+  - --share=ipc
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri
+modules:
+  - name: edt-chess
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/edt-chess/cargo
+    build-commands:
+      - cargo --offline build --release || cargo build --release
+      - install -Dm755 target/release/edt-chess /app/bin/edt-chess
+      - install -Dm644 packaging/edt-chess.desktop /app/share/applications/com.github.edt11x.edt_chess.desktop
+    sources:
+      - type: dir
+        path: ../..

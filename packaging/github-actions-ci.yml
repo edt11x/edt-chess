@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [master, slint, main]
+  pull_request:
+    branches: [master, slint, main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test & build (Linux)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libfontconfig1-dev \
+            libxkbcommon-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libxkbcommon-x11-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: cargo test
+        run: cargo test --all
+
+      - name: cargo build --release
+        run: cargo build --release
+
+      - name: CLI smoke
+        run: |
+          ./target/release/edt-chess --version
+          ./target/release/edt-chess --help
+
+      - name: Upload release binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: edt-chess-linux
+          path: target/release/edt-chess

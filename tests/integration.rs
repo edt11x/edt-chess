@@ -10,6 +10,7 @@ fn package_metadata_present() {
     assert_eq!(APP_NAME, "edt-chess");
     assert!(!VERSION.is_empty());
     assert!(VERSION.chars().next().unwrap().is_ascii_digit());
+    assert!(VERSION.starts_with("0.3"), "expected 0.3.x, got {VERSION}");
 }
 
 #[test]

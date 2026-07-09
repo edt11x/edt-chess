@@ -1,4 +1,4 @@
-import { Button, VerticalBox, HorizontalBox, ScrollView, ComboBox } from "std-widgets.slint";
+import { Button, VerticalBox, HorizontalBox, ScrollView } from "std-widgets.slint";
 
 export struct SquareData {
     piece: string,
@@ -11,23 +11,35 @@ export struct SquareData {
 
 export component AppWindow inherits Window {
     title: "edt-chess — Chess Practice";
-    preferred-width: 920px;
-    preferred-height: 680px;
-    min-width: 720px;
-    min-height: 560px;
+    preferred-width: 980px;
+    preferred-height: 720px;
+    min-width: 780px;
+    min-height: 600px;
     background: #1a1d23;
 
-    // --- Bound from Rust ---
     in-out property <[SquareData]> squares: [];
     in property <string> status-text: "White to move";
     in property <string> eval-text: "Eval: —";
     in property <string> last-move-text: "";
     in property <string> hint-text: "";
     in property <string> player-color-text: "You: White";
+    in property <string> move-list-text: "";
+    in property <string> practice-text: "";
+    in property <string> theme: "classic";
+    in property <string> mode: "play";
     in property <bool> show-color-picker: true;
+    in property <bool> show-promotion: false;
+    in property <bool> show-mode-picker: false;
     in property <bool> ai-thinking: false;
     in property <bool> board-flipped: false;
     in property <string> difficulty: "medium";
+    in property <string> pgn-status: "";
+
+    // Theme colors
+    property <color> light-sq: theme == "wood" ? #f0d9b5 : (theme == "green" ? #eeeed2 : #e8edf2);
+    property <color> dark-sq: theme == "wood" ? #b58863 : (theme == "green" ? #769656 : #4a6fa5);
+    property <color> select-sq: #6b9bd1;
+    property <color> last-sq: #c9a22788;
 
     callback square-clicked(int);
     callback new-game();
@@ -35,18 +47,24 @@ export component AppWindow inherits Window {
     callback hint();
     callback choose-color(string);
     callback set-difficulty(string);
+    callback promote(string);
+    callback cancel-promote();
+    callback set-theme(string);
+    callback set-mode(string);
+    callback export-pgn();
+    callback start-opening(string);
+    callback next-puzzle();
+    callback show-modes();
 
-    // Board + side panel
     HorizontalBox {
         padding: 16px;
-        spacing: 20px;
+        spacing: 16px;
 
-        // Chessboard area
+        // Chessboard
         VerticalBox {
-            spacing: 8px;
+            spacing: 6px;
             alignment: center;
 
-            // File labels top (when flipped show h-a)
             HorizontalBox {
                 spacing: 0;
                 width: 560px;
@@ -66,7 +84,6 @@ export component AppWindow inherits Window {
                 spacing: 4px;
                 alignment: center;
 
-                // Rank labels
                 VerticalBox {
                     spacing: 0;
                     width: 18px;
@@ -83,7 +100,6 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // 8x8 board
                 Rectangle {
                     width: 560px;
                     height: 560px;
@@ -101,21 +117,17 @@ export component AppWindow inherits Window {
                             for col[c] in [0, 1, 2, 3, 4, 5, 6, 7] : Rectangle {
                                 width: 70px;
                                 height: 70px;
-                                property <int> visual-row: r;
-                                property <int> visual-col: c;
-                                // Map visual position to square index (a1=0 … h8=63)
                                 property <int> sq-index: board-flipped
                                     ? (r * 8 + (7 - c))
                                     : ((7 - r) * 8 + c);
                                 property <SquareData> data: squares[sq-index];
 
                                 background: data.is-selected
-                                    ? #6b9bd1
+                                    ? select-sq
                                     : data.is-last-move
-                                        ? #c9a22755
-                                        : data.is-light ? #e8edf2 : #4a6fa5;
+                                        ? last-sq
+                                        : data.is-light ? light-sq : dark-sq;
 
-                                // Legal-move target ring
                                 if data.is-target : Rectangle {
                                     width: data.piece == "" ? 18px : 62px;
                                     height: data.piece == "" ? 18px : 62px;
@@ -136,15 +148,12 @@ export component AppWindow inherits Window {
                                 }
 
                                 TouchArea {
-                                    clicked => {
-                                        root.square-clicked(sq-index);
-                                    }
+                                    clicked => { root.square-clicked(sq-index); }
                                 }
                             }
                         }
                     }
 
-                    // Dim overlay while AI thinks
                     if ai-thinking : Rectangle {
                         background: #00000055;
                         Text {
@@ -164,40 +173,47 @@ export component AppWindow inherits Window {
 
         // Side panel
         VerticalBox {
-            spacing: 12px;
-            width: 280px;
+            spacing: 8px;
+            width: 320px;
 
             Text {
                 text: "Chess Practice";
                 color: #f0f3f7;
-                font-size: 22px;
+                font-size: 20px;
                 font-weight: 700;
             }
 
             Text {
-                text: player-color-text;
+                text: player-color-text + "  ·  " + mode;
                 color: #a8b0bb;
-                font-size: 14px;
+                font-size: 13px;
+            }
+
+            if practice-text != "" : Text {
+                text: practice-text;
+                color: #7dcea0;
+                font-size: 12px;
+                wrap: word-wrap;
             }
 
             Rectangle {
                 background: #252a33;
                 border-radius: 8px;
-                height: 72px;
+                height: 64px;
                 VerticalBox {
-                    padding: 12px;
-                    spacing: 4px;
+                    padding: 10px;
+                    spacing: 2px;
                     Text {
                         text: status-text;
                         color: #f0f3f7;
-                        font-size: 16px;
+                        font-size: 15px;
                         font-weight: 600;
                         wrap: word-wrap;
                     }
                     Text {
                         text: last-move-text;
                         color: #8b919a;
-                        font-size: 13px;
+                        font-size: 12px;
                     }
                 }
             }
@@ -205,14 +221,38 @@ export component AppWindow inherits Window {
             Rectangle {
                 background: #252a33;
                 border-radius: 8px;
-                height: 48px;
+                height: 40px;
                 HorizontalBox {
-                    padding: 12px;
+                    padding: 10px;
                     Text {
                         text: eval-text;
                         color: #c9d1d9;
-                        font-size: 14px;
+                        font-size: 13px;
                         vertical-alignment: center;
+                    }
+                }
+            }
+
+            Text {
+                text: "Moves";
+                color: #8b919a;
+                font-size: 11px;
+            }
+
+            Rectangle {
+                background: #252a33;
+                border-radius: 8px;
+                vertical-stretch: 1;
+                min-height: 90px;
+                ScrollView {
+                    VerticalBox {
+                        padding: 8px;
+                        Text {
+                            text: move-list-text == "" ? "(no moves yet)" : move-list-text;
+                            color: #c9d1d9;
+                            font-size: 12px;
+                            wrap: word-wrap;
+                        }
                     }
                 }
             }
@@ -220,87 +260,120 @@ export component AppWindow inherits Window {
             if hint-text != "" : Rectangle {
                 background: #1e3a2f;
                 border-radius: 8px;
-                height: 56px;
+                height: 48px;
                 HorizontalBox {
-                    padding: 12px;
+                    padding: 10px;
                     Text {
                         text: hint-text;
                         color: #7dcea0;
-                        font-size: 14px;
+                        font-size: 12px;
                         wrap: word-wrap;
                         vertical-alignment: center;
                     }
                 }
             }
 
-            Text {
-                text: "Difficulty";
+            if pgn-status != "" : Text {
+                text: pgn-status;
                 color: #8b919a;
-                font-size: 12px;
+                font-size: 11px;
+                wrap: word-wrap;
             }
 
+            Text { text: "Difficulty"; color: #8b919a; font-size: 11px; }
             HorizontalBox {
-                spacing: 8px;
+                spacing: 6px;
                 Button {
                     text: "Easy";
-                    enabled: !ai-thinking && !show-color-picker;
+                    enabled: !ai-thinking && !show-color-picker && !show-promotion;
                     primary: difficulty == "easy";
                     clicked => { root.set-difficulty("easy"); }
                 }
                 Button {
-                    text: "Medium";
-                    enabled: !ai-thinking && !show-color-picker;
+                    text: "Med";
+                    enabled: !ai-thinking && !show-color-picker && !show-promotion;
                     primary: difficulty == "medium";
                     clicked => { root.set-difficulty("medium"); }
                 }
                 Button {
                     text: "Hard";
-                    enabled: !ai-thinking && !show-color-picker;
+                    enabled: !ai-thinking && !show-color-picker && !show-promotion;
                     primary: difficulty == "hard";
                     clicked => { root.set-difficulty("hard"); }
                 }
             }
 
+            Text { text: "Theme"; color: #8b919a; font-size: 11px; }
+            HorizontalBox {
+                spacing: 6px;
+                Button {
+                    text: "Blue";
+                    primary: theme == "classic";
+                    clicked => { root.set-theme("classic"); }
+                }
+                Button {
+                    text: "Wood";
+                    primary: theme == "wood";
+                    clicked => { root.set-theme("wood"); }
+                }
+                Button {
+                    text: "Green";
+                    primary: theme == "green";
+                    clicked => { root.set-theme("green"); }
+                }
+            }
+
             VerticalBox {
-                spacing: 8px;
+                spacing: 6px;
                 Button {
                     text: "Hint";
-                    enabled: !ai-thinking && !show-color-picker;
+                    enabled: !ai-thinking && !show-color-picker && !show-promotion && mode == "play";
                     clicked => { root.hint(); }
                 }
                 Button {
                     text: "Undo";
-                    enabled: !ai-thinking && !show-color-picker;
+                    enabled: !ai-thinking && !show-color-picker && !show-promotion;
                     clicked => { root.undo(); }
+                }
+                Button {
+                    text: "Export PGN";
+                    enabled: !ai-thinking && !show-promotion;
+                    clicked => { root.export-pgn(); }
+                }
+                Button {
+                    text: "Modes…";
+                    enabled: !ai-thinking && !show-promotion;
+                    clicked => { root.show-modes(); }
                 }
                 Button {
                     text: "New Game";
                     enabled: !ai-thinking;
                     clicked => { root.new-game(); }
                 }
+                if mode == "tactics" : Button {
+                    text: "Next Puzzle";
+                    enabled: !ai-thinking;
+                    clicked => { root.next-puzzle(); }
+                }
             }
 
-            Rectangle { height: 1px; background: transparent; }
-
             Text {
-                text: "Click a piece, then a destination square. Promotion defaults to queen.";
+                text: "Click piece → destination. Promote with the dialog when needed.";
                 color: #6b7280;
-                font-size: 12px;
+                font-size: 11px;
                 wrap: word-wrap;
             }
         }
     }
 
-    // Color picker overlay at start / new game
+    // Color picker
     if show-color-picker : Rectangle {
         background: #0f1115ee;
         width: 100%;
         height: 100%;
-
         VerticalBox {
             alignment: center;
             spacing: 20px;
-
             Text {
                 text: "Play as…";
                 color: white;
@@ -308,11 +381,9 @@ export component AppWindow inherits Window {
                 font-weight: 700;
                 horizontal-alignment: center;
             }
-
             HorizontalBox {
                 alignment: center;
                 spacing: 24px;
-
                 TouchArea {
                     width: 160px;
                     height: 160px;
@@ -320,28 +391,14 @@ export component AppWindow inherits Window {
                     Rectangle {
                         border-radius: 12px;
                         background: #e8edf2;
-                        border-width: parent.has-hover ? 3px : 0;
-                        border-color: #6b9bd1;
                         VerticalBox {
                             alignment: center;
                             spacing: 8px;
-                            Text {
-                                text: "♔";
-                                font-size: 56px;
-                                horizontal-alignment: center;
-                                color: #111;
-                            }
-                            Text {
-                                text: "White";
-                                font-size: 18px;
-                                font-weight: 600;
-                                horizontal-alignment: center;
-                                color: #111;
-                            }
+                            Text { text: "♔"; font-size: 56px; horizontal-alignment: center; color: #111; }
+                            Text { text: "White"; font-size: 18px; font-weight: 600; horizontal-alignment: center; color: #111; }
                         }
                     }
                 }
-
                 TouchArea {
                     width: 160px;
                     height: 160px;
@@ -349,27 +406,122 @@ export component AppWindow inherits Window {
                     Rectangle {
                         border-radius: 12px;
                         background: #2a2f38;
-                        border-width: parent.has-hover ? 3px : 0;
-                        border-color: #6b9bd1;
                         VerticalBox {
                             alignment: center;
                             spacing: 8px;
+                            Text { text: "♚"; font-size: 56px; horizontal-alignment: center; color: #f0f3f7; }
+                            Text { text: "Black"; font-size: 18px; font-weight: 600; horizontal-alignment: center; color: #f0f3f7; }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Promotion picker
+    if show-promotion : Rectangle {
+        background: #0f1115ee;
+        width: 100%;
+        height: 100%;
+        VerticalBox {
+            alignment: center;
+            spacing: 16px;
+            Text {
+                text: "Promote pawn to…";
+                color: white;
+                font-size: 24px;
+                font-weight: 700;
+                horizontal-alignment: center;
+            }
+            HorizontalBox {
+                alignment: center;
+                spacing: 12px;
+                for item[i] in [
+                    { label: "Queen", glyph: "♕", code: "q" },
+                    { label: "Rook", glyph: "♖", code: "r" },
+                    { label: "Bishop", glyph: "♗", code: "b" },
+                    { label: "Knight", glyph: "♘", code: "n" },
+                ] : TouchArea {
+                    width: 100px;
+                    height: 120px;
+                    clicked => { root.promote(item.code); }
+                    Rectangle {
+                        border-radius: 10px;
+                        background: #252a33;
+                        border-width: parent.has-hover ? 2px : 0;
+                        border-color: #6b9bd1;
+                        VerticalBox {
+                            alignment: center;
+                            spacing: 6px;
                             Text {
-                                text: "♚";
-                                font-size: 56px;
+                                text: item.glyph;
+                                font-size: 40px;
                                 horizontal-alignment: center;
                                 color: #f0f3f7;
                             }
                             Text {
-                                text: "Black";
-                                font-size: 18px;
-                                font-weight: 600;
+                                text: item.label;
+                                font-size: 14px;
                                 horizontal-alignment: center;
-                                color: #f0f3f7;
+                                color: #c9d1d9;
                             }
                         }
                     }
                 }
+            }
+            Button {
+                text: "Cancel";
+                clicked => { root.cancel-promote(); }
+            }
+        }
+    }
+
+    // Mode picker
+    if show-mode-picker : Rectangle {
+        background: #0f1115ee;
+        width: 100%;
+        height: 100%;
+        VerticalBox {
+            alignment: center;
+            spacing: 12px;
+            padding: 24px;
+            Text {
+                text: "Practice Modes";
+                color: white;
+                font-size: 24px;
+                font-weight: 700;
+                horizontal-alignment: center;
+            }
+            Button {
+                text: "Play vs Computer";
+                clicked => { root.set-mode("play"); }
+            }
+            Text {
+                text: "Openings (as White)";
+                color: #8b919a;
+                font-size: 13px;
+                horizontal-alignment: center;
+            }
+            HorizontalBox {
+                alignment: center;
+                spacing: 8px;
+                Button { text: "Italian"; clicked => { root.start-opening("italian"); } }
+                Button { text: "Ruy Lopez"; clicked => { root.start-opening("ruy-lopez"); } }
+                Button { text: "Sicilian"; clicked => { root.start-opening("sicilian"); } }
+            }
+            HorizontalBox {
+                alignment: center;
+                spacing: 8px;
+                Button { text: "Q. Gambit"; clicked => { root.start-opening("queens-gambit"); } }
+                Button { text: "London"; clicked => { root.start-opening("london"); } }
+            }
+            Button {
+                text: "Tactics Puzzles";
+                clicked => { root.set-mode("tactics"); }
+            }
+            Button {
+                text: "Close";
+                clicked => { root.set-mode(mode); }
             }
         }
     }
