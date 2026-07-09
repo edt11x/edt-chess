@@ -14,7 +14,7 @@
 | SAN move list + PGN export | Done |
 | Stronger AI (ID + TT + depths to 5) | Done |
 | Board themes (classic/wood/green) | Done |
-| GitHub Actions CI | Done |
+| GitHub Actions CI | Template at `packaging/github-actions-ci.yml` (copy to `.github/workflows/` with workflow-scope token) |
 | Packaging docs + Flatpak draft | Done |
 | Opening trainer (5 lines) | Done |
 | Tactics puzzles (4 positions) | Done |
